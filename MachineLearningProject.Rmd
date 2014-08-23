@@ -1,0 +1,103 @@
+---
+title: "Coursera Practical Machine Learning : Course Project"
+author: "Yuka Esashi"
+date: "August 23, 2014"
+output: html_document
+---
+
+## Synopsis
+
+Personal devices are making it now possible to collect a large amount of data about personal activity relatively inexpensively. This analysis aims to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants, and to build a model to predict the manner in which they did the exercise.
+
+## Data Processing
+
+First, we download the data and call relevant packages in R.
+
+```{r}
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", "~/train.csv", method="curl")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", "~/test.csv", method="curl")
+
+library(caret)
+library(randomForest)
+```
+
+One of the data files is for training, the other for testing.
+
+```{r}
+train <- read.table("~/train.csv", header=TRUE, sep=",")
+test <- read.table("~/test.csv", header=TRUE, sep = ",")
+```
+
+We investigate the nature of the data set.
+
+```{r}
+str(train)
+```
+
+First, we create a subset of the data set that only contains quantified data about the activities.
+
+```{r}
+trainNum <- train[,c(8:159)]
+```
+
+From the investigation it was clear that the variables that has the class "factor" contained a large amount of blank values. These variables can be removed.
+
+```{r}
+check <- as.data.frame(sapply(trainNum, class))
+check1 <- subset(check, !sapply(trainNum, class)=="factor")
+names <- rownames(check1)
+trainNum1 <- trainNum[,names]
+```
+
+Next, we remove variables from the data set that has small variance.
+
+```{r}
+smallVar <- nearZeroVar(trainNum1)
+trainNum2 <- trainNum1[,-smallVar]
+```
+
+Finally, we remove variables that have too much NA values. To do this we investigate the number of NA values each variable has.
+
+```{r}
+valid <- function(x){length(na.omit(x))}
+check2 <- as.data.frame(apply(trainNum2, 2, valid))
+check2
+```
+
+It seems that variables either have 19622 or 406 non-NA values. So we decide to remove variables that has only 406 non-NA values.
+
+```{r}
+check3 <- subset(check2, apply(trainNum2, 2, valid)=="19622")
+names <- rownames(check3)
+trainNum3 <- trainNum2[,names]
+```
+
+To finalise the training set, we add the classe variable, which is the outcome we want to predict.
+
+```{r}
+TRAIN <- cbind(train[,160], trainNum3)
+names(TRAIN)[names(TRAIN)=="train[, 160]"] <- "classe"
+```
+
+## The Prediction Model
+
+We use the random tree model.
+
+```{r}
+modFit <- randomForest(classe~., data=TRAIN)
+```
+
+randomForest function has its own cross validation built into itself.
+
+```{r}
+modFit
+```
+
+The OOB estimate of error rate is 0.3%. 
+
+So now using the model we predict the outcome for the testing set.
+
+```{r}
+answers = as.vector(predict(modFit, test))
+answers
+````
